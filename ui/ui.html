@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <!-- 引入figma-plugin-ds的CSS -->
+  <link rel="stylesheet" href="./lib/figma-plugin-ds.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      padding: 16px;
+      margin: 0;
+      overflow: auto;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #selectionContent {
+      background: var(--figma-color-bg-secondary);
+      padding: 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    optgroup {
+      font-weight: 500;
+      color: var(--figma-color-text);
+    }
+
+    option {
+      padding-left: 12px;
+      color: var(--figma-color-text);
+    }
+
+    .select {
+      width: 100%;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 下拉框区域 -->
+    <div class="control-group" style="display: flex; gap: 8px;">
+      <div style="flex: 1;">
+        <select id="select1" class="select">
+          <optgroup label="样式">
+            <option value="tag-level-1">大标签</option>
+            <option value="tag-level-2">中标签</option>
+            <option value="tag-level-3">小标签</option>
+          </optgroup>
+          <optgroup label="组件">
+            <option value="component-1">组件 1</option>
+            <option value="component-2">组件 2</option>
+            <option value="component-3">组件 3</option>
+          </optgroup>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="action-buttons" style="flex-direction: column; align-items: stretch; gap: 8px;">
+      <button id="getAllNodesBtn" class="button button--primary">获取所有节点（仅可见）</button>
+      <button id="getAllNodesWithHiddenBtn" class="button button--primary">获取所有节点（包含隐藏）</button>
+      <div style="display: flex; gap: 8px;">
+        <button id="getSelectionBtn" class="button button--primary">获取选中内容</button>
+        <button id="addTagBtn" class="button button--primary">新增标识</button>
+        <button id="clearTagBtn" class="button button--secondary">清除标签</button>
+      </div>
+    </div>
+
+    <!-- 选中内容显示区域 -->
+    <div id="selectionInfo">
+      <div class="label">选中节点信息</div>
+      <div id="selectionContent">暂无选中内容</div>
+      <div style="margin-top: 8px;">
+        <button id="copyBtn" class="button button--secondary">复制节点信息</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 获取DOM元素
+    const getSelectionBtn = document.getElementById('getSelectionBtn');
+    const getAllNodesBtn = document.getElementById('getAllNodesBtn');
+    const getAllNodesWithHiddenBtn = document.getElementById('getAllNodesWithHiddenBtn');
+    const addTagBtn = document.getElementById('addTagBtn');
+    const clearTagBtn = document.getElementById('clearTagBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const selectionContent = document.getElementById('selectionContent');
+    const select1 = document.getElementById('select1');
+    const select2 = document.getElementById('select2');
+
+    // 获取选中内容的函数
+    function getSelection() {
+      parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+    }
+
+    // 获取选中内容按钮点击事件
+    getSelectionBtn.addEventListener('click', getSelection);
+
+    // 获取所有节点按钮点击事件
+    getAllNodesBtn.addEventListener('click', function() {
+      parent.postMessage({
+        pluginMessage: {
+          type: 'get-all-nodes'
+        }
+      }, '*');
+    });
+
+    // 获取所有节点（包含隐藏）按钮点击事件
+    getAllNodesWithHiddenBtn.addEventListener('click', function() {
+      parent.postMessage({
+        pluginMessage: {
+          type: 'get-all-nodes-with-hidden'
+        }
+      }, '*');
+    });
+
+    // 新增标识按钮点击事件
+    addTagBtn.addEventListener('click', function() {
+      const selectedOption = select1.options[select1.selectedIndex];
+      const selectedOptgroup = selectedOption.parentElement;
+      const groupLabel = selectedOptgroup.label;
+      const selectedValue = select1.value;
+
+      parent.postMessage({
+        pluginMessage: {
+          type: 'add-tag',
+          tagType: selectedValue,
+          groupType: groupLabel,
+          shouldUpdateSelection: true // 添加标记，表示需要更新选中内容
+        }
+      }, '*');
+    });
+
+    // 清除标签按钮点击事件
+    clearTagBtn.addEventListener('click', function() {
+      parent.postMessage({
+        pluginMessage: {
+          type: 'clear-tag',
+          shouldUpdateSelection: true // 添加标记，表示需要更新选中内容
+        }
+      }, '*');
+    });
+
+    // 复制按钮点击事件
+    copyBtn.addEventListener('click', function() {
+      try {
+        // 创建一个临时文本区域
+        const textarea = document.createElement('textarea');
+        textarea.value = selectionContent.textContent;
+        document.body.appendChild(textarea);
+
+        // 选中文本
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // 用于移动设备
+
+        // 执行复制命令
+        document.execCommand('copy');
+
+        // 移除临时文本区域
+        document.body.removeChild(textarea);
+
+        // 显示成功提示
+        copyBtn.textContent = '复制成功！';
+        setTimeout(() => {
+          copyBtn.textContent = '复制节点信息';
+        }, 2000);
+      } catch (err) {
+        console.error('复制失败:', err);
+        copyBtn.textContent = '复制失败';
+        setTimeout(() => {
+          copyBtn.textContent = '复制节点信息';
+        }, 2000);
+      }
+    });
+
+    // 监听来自插件主代码的消息
+    window.onmessage = function(event) {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+
+      if (message.type === 'selection-info') {
+        selectionContent.textContent = JSON.stringify(message.data, null, 2);
+      }
+    };
+
+    // 下拉框变化事件
+    select1.addEventListener('change', function() {
+      console.log('下拉框1选择:', this.value);
+    });
+
+    select2.addEventListener('change', function() {
+      console.log('下拉框2选择:', this.value);
+    });
+  </script>
+</body>
+</html>
