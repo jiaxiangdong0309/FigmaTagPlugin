@@ -76,8 +76,8 @@
 
     <!-- 操作按钮 -->
     <div class="action-buttons" style="flex-direction: column; align-items: stretch; gap: 8px;">
-      <button id="getAllNodesBtn" class="button button--primary">获取所有节点（仅可见）</button>
-      <button id="getAllNodesWithHiddenBtn" class="button button--primary">获取所有节点（包含隐藏）</button>
+      <button id="getAllNodesBtn" class="button button--primary">获取所有节点（过滤）</button>
+      <button id="getAllNodesWithHiddenBtn" class="button button--primary">获取所有节点</button>
       <div style="display: flex; gap: 8px;">
         <button id="getSelectionBtn" class="button button--primary">获取选中内容</button>
         <button id="addTagBtn" class="button button--primary">新增标识</button>
@@ -89,7 +89,8 @@
     <div id="selectionInfo">
       <div class="label">选中节点信息</div>
       <div id="selectionContent">暂无选中内容</div>
-      <div style="margin-top: 8px;">
+      <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div id="wordCount" style="font-size: 12px; color: var(--figma-color-text-secondary);">总字数：0</div>
         <button id="copyBtn" class="button button--secondary">复制节点信息</button>
       </div>
     </div>
@@ -105,7 +106,6 @@
     const copyBtn = document.getElementById('copyBtn');
     const selectionContent = document.getElementById('selectionContent');
     const select1 = document.getElementById('select1');
-    const select2 = document.getElementById('select2');
 
     // 获取选中内容的函数
     function getSelection() {
@@ -197,18 +197,34 @@
       const message = event.data.pluginMessage;
       if (!message) return;
 
-      if (message.type === 'selection-info') {
-        selectionContent.textContent = JSON.stringify(message.data, null, 2);
+      if (message.type === 'clear-selection-info') {
+        // 清空显示内容
+        selectionContent.textContent = '正在加载...';
+        document.getElementById('wordCount').textContent = '总字数：0';
+      } else if (message.type === 'selection-info' || message.type === 'all-nodes-info') {
+        // 更新显示内容
+        if (message.data && message.data.length > 0) {
+          const jsonString = JSON.stringify(message.data, null, 2);
+          selectionContent.textContent = jsonString;
+          // 更新字数统计 - 去除空格和换行符后计算
+          const cleanContent = jsonString.replace(/\s+/g, '');
+          document.getElementById('wordCount').textContent = `总字数：${cleanContent.length}`;
+        } else {
+          selectionContent.textContent = '暂无选中内容';
+          document.getElementById('wordCount').textContent = '总字数：0';
+        }
+      } else if (message.type === 'tag-added') {
+        // 标签添加成功后更新选中内容
+        getSelection();
+      } else if (message.type === 'tags-cleared') {
+        // 标签清除成功后更新选中内容
+        getSelection();
       }
     };
 
     // 下拉框变化事件
     select1.addEventListener('change', function() {
       console.log('下拉框1选择:', this.value);
-    });
-
-    select2.addEventListener('change', function() {
-      console.log('下拉框2选择:', this.value);
     });
   </script>
 </body>
