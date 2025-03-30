@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <!-- 引入figma-plugin-ds的CSS -->
-  <link rel="stylesheet" href="./lib/figma-plugin-ds.css">
+  <!-- <link rel="stylesheet" href="./lib/figma-plugin-ds.css"> -->
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -59,24 +59,33 @@
     <div class="control-group" style="display: flex; gap: 8px;">
       <div style="flex: 1;">
         <select id="select1" class="select">
-          <optgroup label="样式">
-            <option value="tag-level-1">大标签</option>
-            <option value="tag-level-2">中标签</option>
-            <option value="tag-level-3">小标签</option>
-          </optgroup>
-          <optgroup label="组件">
-            <option value="component-1">组件 1</option>
-            <option value="component-2">组件 2</option>
-            <option value="component-3">组件 3</option>
-          </optgroup>
         </select>
       </div>
-
     </div>
+
+    <!-- 数据存储区域 -->
+    <script type="application/json" id="selectOptions">
+      {
+        "Placeholder": [
+          { "value": "placeholder-image", "label": "Image" },
+          { "value": "placeholder-rect", "label": "Rect" }
+        ],
+        "Css": [
+          { "value": "tag-level-1", "label": "大标签" },
+          { "value": "tag-level-2", "label": "中标签" },
+          { "value": "tag-level-3", "label": "小标签" }
+        ],
+        "Component": [
+          { "value": "component-1", "label": "组件 1" },
+          { "value": "component-2", "label": "组件 2" },
+          { "value": "component-3", "label": "组件 3" }
+        ]
+      }
+    </script>
 
     <!-- 操作按钮 -->
     <div class="action-buttons" style="flex-direction: column; align-items: stretch; gap: 8px;">
-      <button id="getAllNodesBtn" class="button button--primary">获取所有节点（过滤）</button>
+      <button id="getAllNodesBtn" class="button button--primary">获取过滤后的节点</button>
       <button id="getAllNodesWithHiddenBtn" class="button button--primary">获取所有节点</button>
       <div style="display: flex; gap: 8px;">
         <button id="getSelectionBtn" class="button button--primary">获取选中内容</button>
@@ -95,6 +104,7 @@
       </div>
     </div>
   </div>
+  <script src="./logger.js"></script>
 
   <script>
     // 获取DOM元素
@@ -106,6 +116,32 @@
     const copyBtn = document.getElementById('copyBtn');
     const selectionContent = document.getElementById('selectionContent');
     const select1 = document.getElementById('select1');
+
+    // 初始化下拉框
+    function initializeSelect() {
+      const optionsData = JSON.parse(document.getElementById('selectOptions').textContent);
+
+      // 清空现有选项
+      select1.innerHTML = '';
+
+      // 遍历数据并创建选项组
+      Object.entries(optionsData).forEach(([groupLabel, options]) => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = groupLabel;
+
+        options.forEach(option => {
+          const optionElement = document.createElement('option');
+          optionElement.value = option.value;
+          optionElement.textContent = option.label;
+          optgroup.appendChild(optionElement);
+        });
+
+        select1.appendChild(optgroup);
+      });
+    }
+
+    // 页面加载时初始化下拉框
+    initializeSelect();
 
     // 获取选中内容的函数
     function getSelection() {
@@ -126,6 +162,11 @@
 
     // 获取所有节点（包含隐藏）按钮点击事件
     getAllNodesWithHiddenBtn.addEventListener('click', function() {
+      // 先清空显示
+      selectionContent.textContent = '正在加载...';
+      document.getElementById('wordCount').textContent = '总字数：0';
+
+      // 发送请求
       parent.postMessage({
         pluginMessage: {
           type: 'get-all-nodes-with-hidden'
@@ -135,19 +176,38 @@
 
     // 新增标识按钮点击事件
     addTagBtn.addEventListener('click', function() {
-      const selectedOption = select1.options[select1.selectedIndex];
-      const selectedOptgroup = selectedOption.parentElement;
-      const groupLabel = selectedOptgroup.label;
-      const selectedValue = select1.value;
-
-      parent.postMessage({
-        pluginMessage: {
-          type: 'add-tag',
-          tagType: selectedValue,
-          groupType: groupLabel,
-          shouldUpdateSelection: true // 添加标记，表示需要更新选中内容
+      try {
+        const selectedOption = select1.options[select1.selectedIndex];
+        if (!selectedOption) {
+          console.error('没有选择任何选项');
+          return;
         }
-      }, '*');
+
+        const selectedOptgroup = selectedOption.parentElement;
+        if (!selectedOptgroup) {
+          console.error('无法获取选项组');
+          return;
+        }
+
+        const groupLabel = selectedOptgroup.label;
+        const selectedValue = select1.value;
+
+        console.log('发送标签数据:', {
+          tagType: selectedValue,
+          groupType: groupLabel
+        });
+
+        parent.postMessage({
+          pluginMessage: {
+            type: 'add-tag',
+            tagType: selectedValue,
+            groupType: groupLabel,
+            shouldUpdateSelection: true
+          }
+        }, '*');
+      } catch (error) {
+        console.error('添加标签时发生错误:', error);
+      }
     });
 
     // 清除标签按钮点击事件
@@ -194,31 +254,82 @@
 
     // 监听来自插件主代码的消息
     window.onmessage = function(event) {
-      const message = event.data.pluginMessage;
-      if (!message) return;
-
-      if (message.type === 'clear-selection-info') {
-        // 清空显示内容
-        selectionContent.textContent = '正在加载...';
-        document.getElementById('wordCount').textContent = '总字数：0';
-      } else if (message.type === 'selection-info' || message.type === 'all-nodes-info') {
-        // 更新显示内容
-        if (message.data && message.data.length > 0) {
-          const jsonString = JSON.stringify(message.data, null, 2);
-          selectionContent.textContent = jsonString;
-          // 更新字数统计 - 去除空格和换行符后计算
-          const cleanContent = jsonString.replace(/\s+/g, '');
-          document.getElementById('wordCount').textContent = `总字数：${cleanContent.length}`;
-        } else {
-          selectionContent.textContent = '暂无选中内容';
-          document.getElementById('wordCount').textContent = '总字数：0';
+      console.log('UI 收到消息:', event.data);
+      try {
+        const message = event.data.pluginMessage;
+        if (!message) {
+          console.log('没有 pluginMessage');
+          return;
         }
-      } else if (message.type === 'tag-added') {
-        // 标签添加成功后更新选中内容
-        getSelection();
-      } else if (message.type === 'tags-cleared') {
-        // 标签清除成功后更新选中内容
-        getSelection();
+
+        console.log('消息类型:', message.type);
+
+        if (message.type === 'clear-selection-info') {
+          console.log('清空选中内容');
+          selectionContent.textContent = '正在加载...';
+          document.getElementById('wordCount').textContent = '总字数：0';
+        } else if (message.type === 'selection-info') {
+          console.log('收到选中内容数据类型:', typeof message.data);
+
+          // 检查数据是否存在
+          if (message.data === undefined || message.data === null) {
+            console.error('收到空数据');
+            selectionContent.textContent = '获取数据失败: 空数据';
+            document.getElementById('wordCount').textContent = '总字数：0';
+            return;
+          }
+
+          // 更新显示内容
+          let content;
+          if (Array.isArray(message.data)) {
+            console.log('数据是数组，长度:', message.data.length);
+            // 数组数据
+            if (message.data.length === 0) {
+              content = '没有可显示的节点数据';
+            } else if (message.data[0] && message.data[0].error) {
+              content = `获取数据出错: ${message.data[0].error}`;
+            } else {
+              // 检查是否有任何节点包含错误
+              const hasErrors = message.data.some(item => item && item.error);
+              if (hasErrors) {
+                content = '部分节点处理出错:\n' + JSON.stringify(message.data, null, 2);
+              } else {
+                content = JSON.stringify(message.data, null, 2);
+              }
+            }
+          } else if (typeof message.data === 'object') {
+            console.log('数据是对象');
+            // 单个对象数据（如错误消息）
+            if (message.data.message) {
+              content = message.data.message;
+            } else if (message.data.error) {
+              content = `错误: ${message.data.error}`;
+            } else {
+              content = JSON.stringify(message.data, null, 2);
+            }
+          } else {
+            console.log('数据是其他类型');
+            // 其他类型数据
+            content = String(message.data);
+          }
+
+          console.log('处理后的显示内容长度:', content.length);
+          selectionContent.textContent = content;
+
+          // 更新字数统计
+          const cleanContent = content.replace(/\s+/g, '');
+          document.getElementById('wordCount').textContent = `总字数：${cleanContent.length}`;
+        } else if (message.type === 'tag-added') {
+          console.log('标签添加成功');
+          // 标签添加成功后更新选中内容
+          getSelection();
+        } else if (message.type === 'tags-cleared') {
+          console.log('标签清除成功');
+          // 标签清除成功后更新选中内容
+          getSelection();
+        }
+      } catch (error) {
+        console.error('处理消息时发生错误:', error);
       }
     };
 

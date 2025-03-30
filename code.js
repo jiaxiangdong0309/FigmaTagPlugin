@@ -3,7 +3,7 @@ figma.showUI(__html__, { width: 320, height: 600 });
 
 // 将RGBA颜色转换为十六进制格式（包含透明度）
 function rgbaToHex(r, g, b, a = 1) {
-  console.log("rgbaToHex 接收到参数:", {
+  console.log("rgbaToHex 接收到原始参数:", {
     r: r,
     g: g,
     b: b,
@@ -12,7 +12,17 @@ function rgbaToHex(r, g, b, a = 1) {
     gType: typeof g,
     bType: typeof b,
     aType: typeof a,
+    rValue: Number(r),
+    gValue: Number(g),
+    bValue: Number(b),
+    aValue: Number(a),
   });
+
+  // 尝试转换参数为数字
+  r = Number(r);
+  g = Number(g);
+  b = Number(b);
+  a = Number(a);
 
   // 检查输入是否有效数字
   if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(a)) {
@@ -182,53 +192,50 @@ function filterGradientProperties(nodeInfo) {
   return filtered;
 }
 
-// 获取节点信息的函数（包含不可见节点）
-function getNodeInfoWithHidden(node) {
-  let info = {
-    id: node.id,
-    name: node.name,
-    type: node.type,
-    width: Math.round(node.width),
-    height: Math.round(node.height),
-    x: Math.round(node.x),
-    y: Math.round(node.y),
-    rotation: Math.round(node.rotation),
-    visible: node.visible,
-  };
-
-  // 添加可选属性
-  if (node.fills) info.fills = node.fills;
-  if (node.strokes) info.strokes = node.strokes;
-  if (node.strokeWeight) info.strokeWeight = Math.round(node.strokeWeight);
-  if (node.characters) info.text = node.characters;
-  if (node.cornerRadius) info.cornerRadius = Math.round(node.cornerRadius);
-  if (node.pointCount) info.pointCount = Math.round(node.pointCount);
-
-  // 添加插件数据
-  const cssStyle = node.getPluginData("common_css_style");
-  const commonStyle = node.getPluginData("common_component_style");
-  if (cssStyle) info.common_css_style = cssStyle;
-  if (commonStyle) info.common_component_style = commonStyle;
-
-  // 如果有子节点，递归获取所有子节点信息
-  if ("children" in node) {
-    info.children = node.children.map((child) => getNodeInfoWithHidden(child));
-  }
-
-  // 不在这里过滤渐变属性
-  return info;
-}
-
 // 辅助函数：检查基础属性是否有效
 function hasValidBasicProps(node) {
-  const isValid = node.visible && node.width > 0 && node.height > 0;
-  if (!isValid) {
-    // console.log(`节点 ${node.name}(${node.id}) 基础属性检查未通过:`, {
-    //   visible: node.visible,
-    //   width: node.width,
-    //   height: node.height,
-    // });
+  console.log(`检查节点 ${node.name} 的基础属性:`, {
+    visible: node.visible,
+    width: node.width,
+    height: node.height,
+    widthType: typeof node.width,
+    heightType: typeof node.height,
+  });
+
+  // 检查可见性
+  if (!node.visible) {
+    console.log(`节点 ${node.name} 不可见`);
+    return false;
   }
+
+  // 特殊处理 Symbol 类型的宽度和高度
+  if (typeof node.width === "symbol" || typeof node.height === "symbol") {
+    console.log(`节点 ${node.name} 的宽度或高度是 Symbol 类型，视为无效`);
+    return false;
+  }
+
+  // 尝试转换为数字并检查
+  const numericWidth = Number(node.width);
+  const numericHeight = Number(node.height);
+
+  const isValid =
+    !isNaN(numericWidth) &&
+    !isNaN(numericHeight) &&
+    numericWidth > 0 &&
+    numericHeight > 0;
+
+  if (!isValid) {
+    console.log(`节点 ${node.name}(${node.id}) 基础属性检查未通过:`, {
+      visible: node.visible,
+      width: node.width,
+      height: node.height,
+      numericWidth: numericWidth,
+      numericHeight: numericHeight,
+      isNaNWidth: isNaN(numericWidth),
+      isNaNHeight: isNaN(numericHeight),
+    });
+  }
+
   return isValid;
 }
 
@@ -352,22 +359,56 @@ function hasValidText(text) {
 
 // 辅助函数：检查圆角是否有效
 function hasValidCornerRadius(radius) {
-  const isValid = radius !== undefined && radius > 0;
-  if (!isValid) {
-    // console.log("圆角无效:", {
-    //   radius: radius,
-    // });
+  console.log("检查圆角值:", {
+    original: radius,
+    type: typeof radius,
+  });
+
+  // 特殊处理 Symbol 类型
+  if (typeof radius === "symbol") {
+    console.log("圆角值是 Symbol 类型，视为无效");
+    return false;
   }
+
+  // 尝试转换为数字
+  const numericRadius = Number(radius);
+
+  const isValid = !isNaN(numericRadius) && numericRadius > 0;
+
+  if (!isValid) {
+    console.log("圆角无效:", {
+      originalValue: radius,
+      convertedValue: numericRadius,
+      isNaN: isNaN(numericRadius),
+    });
+  }
+
   return isValid;
 }
 
 // 辅助函数：检查点数是否有效
 function hasValidPointCount(count) {
-  const isValid = count !== undefined && count > 0;
+  console.log("检查点数值:", {
+    original: count,
+    type: typeof count,
+  });
+
+  // 特殊处理 Symbol 类型
+  if (typeof count === "symbol") {
+    console.log("点数值是 Symbol 类型，视为无效");
+    return false;
+  }
+
+  // 尝试转换为数字
+  const numericCount = Number(count);
+  const isValid = !isNaN(numericCount) && numericCount > 0;
+
   if (!isValid) {
-    // console.log("点数无效:", {
-    //   count: count,
-    // });
+    console.log("点数无效:", {
+      originalValue: count,
+      convertedValue: numericCount,
+      isNaN: isNaN(numericCount),
+    });
   }
   return isValid;
 }
@@ -386,17 +427,27 @@ function hasValidPluginData(data) {
 
 // 辅助函数：获取基础信息
 function getBasicInfo(node) {
+  // 处理可能的 Symbol 类型的值
+  const getNumericValue = (value) => {
+    if (typeof value === "symbol") {
+      console.log(`发现 Symbol 类型值，转换为0`);
+      return 0;
+    }
+    const num = Number(value);
+    return isNaN(num) ? 0 : Math.round(num);
+  };
+
   const info = {
     name: node.name,
     type: node.type,
-    width: Math.round(node.width),
-    height: Math.round(node.height),
-    x: Math.round(node.x),
-    y: Math.round(node.y),
+    width: getNumericValue(node.width),
+    height: getNumericValue(node.height),
+    x: getNumericValue(node.x),
+    y: getNumericValue(node.y),
   };
 
   if (node.rotation !== 0) {
-    info.rotation = Math.round(node.rotation);
+    info.rotation = getNumericValue(node.rotation);
   }
 
   return info;
@@ -534,12 +585,15 @@ function processStrokes(node, info) {
 function processPluginData(node, info) {
   const cssStyle = node.getPluginData("common_css_style");
   const commonStyle = node.getPluginData("common_component_style");
-
+  const placeholderType = node.getPluginData("common_placeholder_type");
   if (hasValidPluginData(cssStyle)) {
     info.common_css_style = cssStyle;
   }
   if (hasValidPluginData(commonStyle)) {
     info.common_component_style = commonStyle;
+  }
+  if (hasValidPluginData(placeholderType)) {
+    info.common_placeholder_type = placeholderType;
   }
 }
 
@@ -551,34 +605,61 @@ function hasValidContent(info) {
     info.text ||
     info.children ||
     info.common_css_style ||
-    info.common_component_style
+    info.common_component_style ||
+    info.common_placeholder_type
   );
 
   if (!isValid) {
-    // console.log("节点内容无效:", {
-    //   hasFills: !!info.fills,
-    //   hasStrokes: !!info.strokes,
-    //   hasText: !!info.text,
-    //   hasChildren: !!info.children,
-    //   hasCssStyle: !!info.common_css_style,
-    //   hasComponentStyle: !!info.common_component_style,
-    // });
+    console.log("节点内容无效:", {
+      hasFills: !!info.fills,
+      hasStrokes: !!info.strokes,
+      hasText: !!info.text,
+      hasChildren: !!info.children,
+      hasCssStyle: !!info.common_css_style,
+      hasComponentStyle: !!info.common_component_style,
+      hasPlaceholderType: !!info.common_placeholder_type,
+    });
   }
   return isValid;
 }
 
-// 获取节点信息的函数
+// 辅助函数：处理占位符节点
+function filterPlaceholderNode(info) {
+  // 如果节点包含 common_placeholder_type，则移除其所有子节点
+  if (info.common_placeholder_type) {
+    // 删除 children 属性，只保留节点自身信息
+    delete info.children;
+    return info;
+  }
+
+  // 如果没有 common_placeholder_type，则递归处理子节点
+  if (info.children) {
+    info.children = info.children
+      .map((child) => filterPlaceholderNode(child))
+      .filter((child) => child !== null);
+
+    // 如果过滤后没有子节点，删除 children 属性
+    if (info.children.length === 0) {
+      delete info.children;
+    }
+  }
+
+  return info;
+}
+
+// 获取过滤后的节点
 function getNodeInfo(node) {
-  // console.log(`\n开始处理节点: ${node.name}(${node.id})`);
+  console.log(`\n开始处理节点: ${node.name}(${node.id})`);
 
   // 基础可见性检查
   if (!hasValidBasicProps(node)) {
-    // console.log(`节点 ${node.name}(${node.id}) 因基础属性检查未通过而被过滤`);
+    console.log(`节点 ${node.name}(${node.id}) 因基础属性检查未通过而被过滤`);
     return null;
   }
 
   // 获取基础信息
   const info = getBasicInfo(node);
+  console.log(`节点 ${node.name} 基础信息:`, info);
 
   // 处理各种属性
   processFills(node, info);
@@ -595,19 +676,35 @@ function getNodeInfo(node) {
 
   // 处理圆角
   if (node.cornerRadius !== undefined) {
+    console.log("处理节点圆角:", {
+      nodeName: node.name,
+      cornerRadius: node.cornerRadius,
+      type: typeof node.cornerRadius,
+    });
+
     if (hasValidCornerRadius(node.cornerRadius)) {
-      info.cornerRadius = Math.round(node.cornerRadius);
+      const numericRadius = Number(node.cornerRadius);
+      info.cornerRadius = Math.round(numericRadius);
+      console.log("圆角处理结果:", info.cornerRadius);
     } else {
-      // console.log(`节点 ${node.name}(${node.id}) 的圆角无效`);
+      console.log(`节点 ${node.name}(${node.id}) 的圆角无效`);
     }
   }
 
   // 处理点数
   if (node.pointCount !== undefined) {
+    console.log("处理节点点数:", {
+      nodeName: node.name,
+      pointCount: node.pointCount,
+      type: typeof node.pointCount,
+    });
+
     if (hasValidPointCount(node.pointCount)) {
-      info.pointCount = Math.round(node.pointCount);
+      const numericCount = Number(node.pointCount);
+      info.pointCount = Math.round(numericCount);
+      console.log("点数处理结果:", info.pointCount);
     } else {
-      // console.log(`节点 ${node.name}(${node.id}) 的点数无效`);
+      console.log(`节点 ${node.name}(${node.id}) 的点数无效`);
     }
   }
 
@@ -636,20 +733,127 @@ function getNodeInfo(node) {
 
   // 最终有效性检查
   if (!hasValidContent(info)) {
-    // console.log(`节点 ${node.name}(${node.id}) 因内容无效而被过滤`);
+    console.log(`节点 ${node.name}(${node.id}) 因内容无效而被过滤`);
     return null;
   }
 
-  // console.log(`节点 ${node.name}(${node.id}) 处理完成，通过所有检查`);
+  console.log(`节点 ${node.name}(${node.id}) 处理完成，通过所有检查`);
 
   try {
-    // 在这里添加过滤渐变相关属性的步骤
+    // 先过滤渐变相关属性
     const filteredInfo = filterGradientProperties(info);
-    // console.log(`节点 ${node.name} 过滤渐变属性后的数据:`, filteredInfo);
-    return filteredInfo;
+    // 再处理占位符节点
+    const processedInfo = filterPlaceholderNode(filteredInfo);
+    console.log(
+      `节点 ${node.name} 过滤处理后的数据结构:`,
+      Object.keys(processedInfo)
+    );
+    return processedInfo;
   } catch (error) {
     console.error(`处理节点 ${node.name} 时出错:`, error);
     return null;
+  }
+}
+
+// 获取节点信息的函数（包含不可见节点）
+function getNodeInfoWithHidden(node) {
+  try {
+    console.log(`获取带隐藏节点的信息: ${node.name}`);
+
+    // 处理可能的 Symbol 类型的值
+    const getNumericValue = (value) => {
+      if (typeof value === "symbol") {
+        console.log(`发现 Symbol 类型值，转换为0`);
+        return 0;
+      }
+      const num = Number(value);
+      return isNaN(num) ? 0 : Math.round(num);
+    };
+
+    let info = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      width: getNumericValue(node.width),
+      height: getNumericValue(node.height),
+      x: getNumericValue(node.x),
+      y: getNumericValue(node.y),
+      rotation: getNumericValue(node.rotation),
+      visible: node.visible,
+    };
+
+    // 添加可选属性
+    if (node.fills) {
+      // 处理fills对象，确保color是字符串格式
+      info.fills = node.fills.map((fill) => {
+        const processed = Object.assign({}, fill);
+        if (
+          fill.type === "SOLID" &&
+          fill.color &&
+          typeof fill.color === "object"
+        ) {
+          processed.color = processColor(fill.color);
+        }
+        return processed;
+      });
+    }
+
+    if (node.strokes) {
+      // 处理strokes对象，确保color是字符串格式
+      info.strokes = node.strokes.map((stroke) => {
+        const processed = Object.assign({}, stroke);
+        if (
+          stroke.type === "SOLID" &&
+          stroke.color &&
+          typeof stroke.color === "object"
+        ) {
+          processed.color = processColor(stroke.color);
+        }
+        return processed;
+      });
+    }
+
+    if (node.strokeWeight !== undefined) {
+      info.strokeWeight = getNumericValue(node.strokeWeight);
+    }
+    if (node.characters) info.text = node.characters;
+    if (node.cornerRadius !== undefined) {
+      // 特殊处理 Symbol 类型的圆角
+      if (typeof node.cornerRadius !== "symbol") {
+        info.cornerRadius = getNumericValue(node.cornerRadius);
+      }
+    }
+    if (node.pointCount !== undefined) {
+      // 特殊处理 Symbol 类型的点数
+      if (typeof node.pointCount !== "symbol") {
+        info.pointCount = getNumericValue(node.pointCount);
+      }
+    }
+
+    // 添加插件数据
+    const cssStyle = node.getPluginData("common_css_style");
+    const commonStyle = node.getPluginData("common_component_style");
+    const placeholderType = node.getPluginData("common_placeholder_type");
+    if (cssStyle) info.common_css_style = cssStyle;
+    if (commonStyle) info.common_component_style = commonStyle;
+    if (placeholderType) info.common_placeholder_type = placeholderType;
+
+    // 如果有子节点，递归获取所有子节点信息
+    if ("children" in node) {
+      info.children = node.children.map((child) =>
+        getNodeInfoWithHidden(child)
+      );
+    }
+
+    console.log(`成功处理节点 ${node.name}`);
+    return info;
+  } catch (error) {
+    console.error(`处理节点 ${node.name} 时出错:`, error);
+    return {
+      name: node.name,
+      id: node.id,
+      error: error.message,
+    };
   }
 }
 
@@ -662,6 +866,7 @@ figma.ui.onmessage = async (msg) => {
     });
 
     const selection = figma.currentPage.selection;
+    console.log("获取所有节点（包含隐藏）- 选中节点数:", selection.length);
 
     if (selection.length === 0) {
       figma.ui.postMessage({
@@ -673,14 +878,28 @@ figma.ui.onmessage = async (msg) => {
       return;
     }
 
-    // 获取所有选中节点及其子节点的信息（包含不可见节点）
-    const allNodesInfo = selection.map((node) => getNodeInfoWithHidden(node));
+    try {
+      // 获取所有选中节点及其子节点的信息（包含不可见节点）
+      const allNodesInfo = selection.map((node) => getNodeInfoWithHidden(node));
+      console.log("所有节点信息处理完成，节点数:", allNodesInfo.length);
 
-    // 发送所有节点信息到UI
-    figma.ui.postMessage({
-      type: "selection-info",
-      data: allNodesInfo,
-    });
+      // 发送所有节点信息到UI
+      figma.ui.postMessage({
+        type: "selection-info",
+        data: allNodesInfo,
+      });
+      console.log("包含隐藏节点的数据已发送");
+    } catch (error) {
+      console.error("处理包含隐藏节点的数据时出错:", error);
+      figma.ui.postMessage({
+        type: "selection-info",
+        data: [
+          {
+            error: error.message,
+          },
+        ],
+      });
+    }
   } else if (msg.type === "get-all-nodes") {
     // 先发送清空消息
     figma.ui.postMessage({
@@ -688,6 +907,7 @@ figma.ui.onmessage = async (msg) => {
     });
 
     const selection = figma.currentPage.selection;
+    console.log("当前选中的节点数量:", selection.length);
 
     if (selection.length === 0) {
       figma.ui.postMessage({
@@ -699,20 +919,37 @@ figma.ui.onmessage = async (msg) => {
       return;
     }
 
-    // 获取所有选中节点及其子节点的信息，并过滤掉不可见的节点
-    const allNodesInfo = selection
-      .map((node) => getNodeInfo(node))
-      .filter((info) => info !== null); // 过滤掉不可见的顶层节点
+    try {
+      // 获取所有选中节点及其子节点的信息，并过滤掉不可见的节点
+      const allNodesInfo = selection
+        .map((node) => {
+          console.log("正在处理节点:", node.name);
+          const info = getNodeInfo(node);
+          console.log("节点处理结果:", info ? "成功" : "被过滤");
+          return info;
+        })
+        .filter((info) => info !== null); // 过滤掉不可见的顶层节点
 
-    // console.log("处理完成，准备发送数据:", allNodesInfo);
+      console.log("处理完成，节点数据:", allNodesInfo);
 
-    // 发送所有节点信息到UI
-    figma.ui.postMessage({
-      type: "selection-info",
-      data: allNodesInfo,
-    });
+      // 发送所有节点信息到UI
+      figma.ui.postMessage({
+        type: "selection-info",
+        data: allNodesInfo,
+      });
 
-    // console.log("数据已发送到UI");
+      console.log("数据已发送到UI");
+    } catch (error) {
+      console.error("处理节点时发生错误:", error);
+      figma.ui.postMessage({
+        type: "selection-info",
+        data: [
+          {
+            error: error.message,
+          },
+        ],
+      });
+    }
   } else if (msg.type === "get-selection") {
     // 先发送清空消息
     figma.ui.postMessage({
@@ -755,8 +992,10 @@ figma.ui.onmessage = async (msg) => {
       // 添加插件数据
       const cssStyle = node.getPluginData("common_css_style");
       const commonStyle = node.getPluginData("common_component_style");
+      const placeholderType = node.getPluginData("common_placeholder_type");
       if (cssStyle) info.common_css_style = cssStyle;
       if (commonStyle) info.common_component_style = commonStyle;
+      if (placeholderType) info.common_placeholder_type = placeholderType;
 
       return info;
     });
@@ -775,13 +1014,16 @@ figma.ui.onmessage = async (msg) => {
         return;
       }
 
-      // 为每个选中的元素添加属性
+      // 只为当前选中的元素添加属性，不处理子节点
       for (const node of selection) {
         // 根据分组类型添加不同的字段
-        if (msg.groupType === "样式") {
+        if (msg.groupType === "Css") {
           node.setPluginData("common_css_style", msg.tagType);
-        } else if (msg.groupType === "组件") {
+        } else if (msg.groupType === "Component") {
           node.setPluginData("common_component_style", msg.tagType);
+        } else if (msg.groupType === "Placeholder") {
+          // 对于占位符类型，我们可以根据需要设置其他属性
+          node.setPluginData("common_placeholder_type", msg.tagType);
         }
       }
 
@@ -812,13 +1054,19 @@ figma.ui.onmessage = async (msg) => {
         const hasCommonCommonStyle = node.getPluginData(
           "common_component_style"
         );
+        const hasPlaceholderType = node.getPluginData(
+          "common_placeholder_type"
+        );
 
-        if (hasCommonCssStyle || hasCommonCommonStyle) {
+        if (hasCommonCssStyle || hasCommonCommonStyle || hasPlaceholderType) {
           if (hasCommonCssStyle) {
             node.setPluginData("common_css_style", "");
           }
           if (hasCommonCommonStyle) {
             node.setPluginData("common_component_style", "");
+          }
+          if (hasPlaceholderType) {
+            node.setPluginData("common_placeholder_type", "");
           }
           clearedCount++;
         }

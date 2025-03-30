@@ -1,14 +1,8 @@
 {
-  "name": "标签生成器",
-  "id": "figma-plugin-ds-tag-generator",
+  "name": "自定义插件",
+  "id": "figma-plugin-custom-plugin",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui/ui.html",
-  "editorType": ["figma"],
-  "menu": [
-    {
-      "name": "标签生成器",
-      "command": "open-plugin"
-    }
-  ]
+  "editorType": ["figma"]
 }
